@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-listener-deployment
+  labels:
+    app: queue-listener
+spec:
+  selector:
+    matchLabels:
+      app: queue-listener
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: queue-listener
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_queue-listener
+          imagePullPolicy: IfNotPresent
+          name: queue-listener
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

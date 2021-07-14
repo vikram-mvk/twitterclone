@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-manager-deployment
+  labels:
+    app: cache-manager
+spec:
+  selector:
+    matchLabels:
+      app: cache-manager
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: cache-manager
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_cache-manager
+          imagePullPolicy: IfNotPresent
+          name: cache-manager
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
