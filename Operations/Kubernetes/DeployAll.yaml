@@ -1,0 +1,445 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s3worker-deployment
+  labels:
+    app: s3worker
+    tier: middle
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 3
+  selector:
+    matchLabels:
+      app: s3worker
+      tier: middle
+  template:
+    metadata:
+      labels:
+        app: s3worker
+        tier: middle
+    spec:
+      containers:
+        - name: s3worker
+          image: vikrammvk/s3uploader:latest
+          resources:
+            requests:
+              memory: "40Mi"
+              cpu: "40m"
+            limits:
+              memory: "50Mi"
+              cpu: "50m"
+          ports:
+            - containerPort: 5001
+              hostPort: 5001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: s3worker-service
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+  labels:
+    app: s3worker
+    tier: middle
+spec:
+  type: LoadBalancer
+  selector:
+    app: s3worker
+    tier: middle
+  ports:
+  - port: 30002
+    targetPort: 5001
+    nodePort: 30002
+
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-s3worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: s3worker-deployment
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 30
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 25Mi
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-deployment
+  labels:
+   app: mongodb
+spec:
+  selector:
+    matchLabels:
+      app: mongodb
+  replicas: 1 # tells deployment to run 1 pod matching the template
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:latest
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+spec:
+  selector:
+    app: mongodb
+  type: LoadBalancer    
+  ports:
+    - port: 27017
+      protocol: TCP
+      targetPort: 27017
+
+---
+
+# React Frontend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  labels:
+    app: react
+spec:
+  selector:
+    matchLabels:
+      app: react
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: react
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_frontend
+          imagePullPolicy: IfNotPresent
+          name: react
+          ports:
+          - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# React Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: react
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# Horizontal Pod Autoscaler for the Frontend Deployment
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: frontend-deployment
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 32Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-manager-deployment
+  labels:
+    app: cache-manager
+spec:
+  selector:
+    matchLabels:
+      app: cache-manager
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: cache-manager
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_cache-manager
+          imagePullPolicy: IfNotPresent
+          name: cache-manager
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-listener-deployment
+  labels:
+    app: queue-listener
+spec:
+  selector:
+    matchLabels:
+      app: queue-listener
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: queue-listener
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_queue-listener
+          imagePullPolicy: IfNotPresent
+          name: queue-listener
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+---
+# NodeJs Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-deployment
+  labels:
+    app: nodejs
+spec:
+  selector:
+    matchLabels:
+      app: nodejs
+  replicas: 1
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: nodejs
+    spec:
+      containers:
+        - image: vikrammvk/twitterclone_backend
+          imagePullPolicy: IfNotPresent
+          name: nodejs
+          ports:
+          - containerPort: 5000
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+# NodeJs Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nodejs-service
+spec:
+  selector:
+    app: nodejs
+  type: LoadBalancer
+  ports:
+  - port: 5000
+    targetPort: 5000
+
+---
+# NodeJs Server HPA
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-nodejs
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nodejs-deployment
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 50
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: AverageValue
+        averageValue: 32Mi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-deployment
+  labels:
+   app: queue
+spec:
+  selector:
+    matchLabels:
+      app: queue
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: queue
+    spec:
+      containers:
+      - name: queue
+        image: redislabs/rejson:latest
+        ports:
+        - containerPort: 6379
+          name: queue
+        resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: queue-service
+spec:
+  selector:
+    app: queue
+  type: LoadBalancer
+  ports:
+    - port: 6380
+      protocol: TCP
+      targetPort: 6379
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache-deployment
+  labels:
+   app: cache
+spec:
+  selector:
+    matchLabels:
+      app: cache
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cache
+    spec:
+      containers:
+      - name: cache
+        image: redislabs/rejson:latest
+        ports:
+        - containerPort: 6379
+          name: cache
+        resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache-service
+spec:
+  selector:
+    app: cache
+  type: LoadBalancer
+  ports:
+    - port: 6379
+      targetPort: 6379
