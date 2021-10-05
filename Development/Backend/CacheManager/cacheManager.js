@@ -14,21 +14,6 @@ function main () {
 
 const updateCache = async (tweetCollection, tweetCache) => {
     try {
-        /*
-        console.log('listening')
-        tweetCollection.watch().on("change", async next => {
-            const cacheObject = await tweetCache.get(CACHE_KEY)
-            console.log(updatedTweet)
-            for (let i=0; i < cacheObject.CACHED_TWEETS.length; i++) {
-                if (cacheObject.CACHED_TWEETS[i].id == updatedTweet.id) {
-                    cacheObject.CACHED_TWEETS[i] = updatedTweet
-                    await tweetCache.rewerite(CACHE_KEY, cacheObject)
-                }
-            }  
-            console.log(cacheObject) 
-            
-        })
-         */
         const updatedCache = await (tweetCollection.find({}, {projection:{ _id: 0 }}).limit(5).sort({timestamp:-1}).toArray())
         await tweetCache.rewrite(CACHE_KEY, {CACHED_TWEETS : updatedCache})
         console.log('cache updated')
